@@ -1,7 +1,7 @@
 use strict;
 use DBI;
 
-package SimpleMySQL;
+package DBD::mysql::SimpleMySQL;
 use Exporter;
 use vars qw/$VERSION $MOD_DATE $NAME $DEBUG $DEBUG_FILE  @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS/;
 @ISA = qw|Exporter|;
@@ -44,8 +44,8 @@ use vars qw/$VERSION $MOD_DATE $NAME $DEBUG $DEBUG_FILE  @ISA @EXPORT @EXPORT_OK
 );
 
 
-$VERSION = q|$Revision: 1.3 $|;
-$MOD_DATE = q|$Date: 2004/04/01 18:27:45 $|;
+$VERSION = q|$Revision: 1.7 $|;
+$MOD_DATE = q|$Date: 2004/04/28 19:34:05 $|;
 $NAME = "SimpleMySQL.pm";
 $DEBUG = 0;
 $DEBUG_FILE = 0;
@@ -105,12 +105,20 @@ sub dbconnect ($) {
 	my $dbinfo = shift;
 
 	${$dbinfo}{host} = 'localhost' unless(defined(${$dbinfo}{host}));
-	${$dbinfo}{dsh} = "DBI:mysql:host=${$dbinfo}{host}" unless(defined(${$dbinfo}{dsh}));
 	${$dbinfo}{user} = scalar(getpwuid($<)) unless(defined(${$dbinfo}{user}));
 	${$dbinfo}{pass} = '' unless(defined(${$dbinfo}{pass}));
+	${$dbinfo}{port} = '3306' unless(defined(${$dbinfo}{port}));
 	${$dbinfo}{RaiseError} = 0 unless(defined(${$dbinfo}{RaiseError}));
 	${$dbinfo}{AutoCommit} = 1 unless(defined(${$dbinfo}{AutoCommit}));
 	
+	unless(defined(${$dbinfo}{dsh})) {
+		${$dbinfo}{dsh} .= "DBI";
+		${$dbinfo}{dsh} .= ":mysql";
+		${$dbinfo}{dsh} .= ":host=${$dbinfo}{host}";
+		${$dbinfo}{dsh} .= ":datasbase=${$dbinfo}{database}" unless(defined(${$dbinfo}{database}));;
+		${$dbinfo}{dsh} .= ":port=${$dbinfo}{port}";
+	}
+
 	my $dbh = DBI->connect(
 		$$dbinfo{dsh}, 
 		$$dbinfo{user}, 
@@ -251,8 +259,9 @@ sub build_joins ($) {
 sub build_wheres ($) {
 	my $wheres = shift;
 
-	my $return = ' WHERE ';
+	my $return;
 	if (ref($wheres)) {
+		$return = ' WHERE ';
 		my @and;
 		for my $where (@{$wheres}) {
 			my $tmp = qq/${$where}{key} ${$where}{type} "${$where}{value}"/;
@@ -261,6 +270,9 @@ sub build_wheres ($) {
 		}
 		$return .= join " AND ", @and;
 	} else {
+		unless ($wheres =~ m/WHERE/i) {
+			$return = ' WHERE ';
+		}
 		$return .= $wheres;
 	}
 
@@ -281,12 +293,37 @@ sub build_delete ($$$) {
 	return $return;
 }
 
-sub build_select ($$$$$) {
-	my $select = shift;
-	my $from = shift;
-	my $joins = shift;
-	my $wheres = shift;
-	my $order = shift;
+sub overload ($$) {
+	my $at = shift;
+	my $argc = shift;
+}
+
+sub build_select {
+	my $select;
+	my $from;
+	my $joins;
+	my $wheres;
+	my $order;
+	my $ref;
+	
+	if (scalar(@_) == 5) {
+		$select = shift;
+		$from = shift;
+		$joins = shift;
+		$wheres = shift;
+		$order = shift;
+	} elsif (scalar(@_) == 1) {
+		$ref = shift;
+		
+		$select = ${$ref}{'select'};
+		$from = ${$ref}{from};
+		$joins = ${$ref}{joins};
+		$wheres = ${$ref}{wheres};
+		$order = ${$ref}{order};
+		$limit = ${$ref}{order};
+	} else {
+		die "build_select must be passed 1 or 5 args";
+	}
 
 	my $return = "SELECT ";
 
@@ -382,3 +419,144 @@ sub dbinsert ($$$) {
 #
 
 1;
+
+## Documentation
+#
+=head1 NAME
+
+DBD::mysql::SimpleMySQL - A simple interface to DBD::mysql
+
+=head1 SYNOPSIS
+
+	my %dbinfo = (
+		user    => 'user',
+		pass    => 'password',
+		dsh   => "DBI:mysql:database=DB:host=127.0.0.1:port=3307"
+	);
+
+	OR 
+	
+	my %dbinfo = (
+		user		=> 'user',
+		pass		=> 'password',
+		database	=> 'DB',
+		host		=> '127.0.0.1',
+		port		=> '3307'
+	);
+
+	$my $dbh = dbconnect(\%dbinfo);
+
+	my $select = ['Passwd.*', 'UsrGrp.UsrGrpName'];
+	my $from = ['Passwd'];
+	my $joins = [];
+	push @{$joins}, join_struct("PasswdHostGrp", "Passwd.PasswdID", "PasswdHostGrp.PasswdID");
+	push @{$joins}, join_struct("UsrGrp", "Passwd.PrimaryGroupID", "UsrGrp.UsrGrpID");
+	my $wheres = "PasswdHostGrp.HostGrpID IN ('group1', 'group2')";
+		
+	my $arrayref = dbselect_array($dbh, build_select($select, $from, $joins, $wheres, 0));
+
+=head1 EXAMPLE
+
+	#!/usr/bin/perl -w
+	#
+	use strict;
+	use DBD::mysql::SimpleMySQL qw/:all/;
+
+	my %dbinfo = (
+		user		=> 'user',
+		pass		=> 'password',
+		database	=> 'DB',
+		host		=> '127.0.0.1',
+		port		=> '3307'
+	);
+
+	$my $dbh = dbconnect(\%dbinfo);
+
+	my $select = ['Passwd.*', 'UsrGrp.UsrGrpName'];
+	my $from = ['Passwd'];
+	my $joins = [];
+	push @{$joins}, join_struct("PasswdHostGrp", "Passwd.PasswdID", "PasswdHostGrp.PasswdID");
+	push @{$joins}, join_struct("UsrGrp", "Passwd.PrimaryGroupID", "UsrGrp.UsrGrpID");
+	my $wheres = "PasswdHostGrp.HostGrpID IN ('group1', 'group2')";
+		
+	my $arrayref = dbselect_array($dbh, build_select($select, $from, $joins, $wheres, 0));
+
+
+	my $i = 1;
+	for my $row (@{$arrayref}) {
+		print "Row $i\n";
+		for my $key (keys(%{$row})) {
+			print "\t$key = ${$row}{$key}\n";
+		}
+		$i++;
+	}
+	
+=head1 DESCRIPTION
+
+DBD::mysql::SimpleMySQL is an extention of the DBI mysql driver. It simplifies getting the data you want out of your DB. I wrote it because I found that everytime I put together a DBI based app I ended up writing these functions anyway.
+
+=head1 Public Methods
+dbinsert
+dbconnect($)
+	Takes a hash ref, return a DBI database handle.
+
+dbselect($$)
+	Takes a DBI db handle and a MySQL query string.
+
+dbselect_arrayref($$)
+	Takes a DBI db handle and a MySQL query string.
+
+dbinsert
+dbupdate($$$$)
+	Takes a DBI db handle, table name string, a hash ref of Columns to update including an "ID" column, and the "ID" column string
+
+dbdo($$)
+	Takes a DBI db handle and a SQL command string. This string is pretty much passed directly to $dbh->do
+
+where_struct($$$)
+	Takes a key, type and value argument.
+		Key is the column name or function in a where clause.
+		Type is the comparison, "LIKE", "IN", "=" etc.
+		Value is the value. "WHERE Key = Value."
+	Returns a reference to be used in "build_wheres"
+
+join_struct($$$)
+	Takes a table, tableid and joinid.
+		Table is the table to join to query.
+		Tableid is the key to join the table on. "JOIN table ON tableid = joinid."
+		Joinid is the key to join the table on. "JOIN table ON tableid = joinid."
+	Returns a reference to be used in "build_joins"
+
+build_joins($)
+	Takes a "join_struct" reference. Builds a LEFT JOIN query string.
+	OR
+	Takes a JOIN string directly including the "JOIN".
+	Returns a LEFT JOIN string to be passed to "build_*"
+
+build_wheres($)
+	Takes a reference to an array of "where_struct" references. Builds a WHERE query string.
+	OR
+	Takes a WHERE string directly not including the "WHERE".
+	Returns a WHERE string to be passed to "build_*"
+
+build_select($$$$$)
+
+build_insert($$)
+
+build_delete($$$)
+
+find_dup($$$$)
+
+=head1 AUTHOR
+
+Jacob Boswell
+
+=head1 COPYRIGHT
+
+DBD::mysql::SimpleMySQL is Copyright(c) 2004 Jacob Boswell. All rights reserved
+You may distribute under the terms of either the GNU General Public License or the Artistic License, as specified in the Perl README file.
+
+=back
+
+=cut
+

@@ -4,7 +4,7 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
 	'NAME'	=> 'DBD::mysql::SimpleMySQL',
-	'VERSION' => '0.2',
+	'VERSION' => '0.4',
 	'DISTNAME' => 'DBD-mysql-SimpleMySQL',
 	'PREREQ_PM' => {
 		'DBI'	=>	1,
