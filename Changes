@@ -1,0 +1,12 @@
+$Header: $
+
+
+REVISION HISTORY:
+
+
+0.1
+	- Created module
+
+0.2
+	- Changed the name from SimpleMySQL to DBD::mysql::SimpleMySQL
+	- Added perldoc documentation and added additional values that can be passwd to dbconnect
