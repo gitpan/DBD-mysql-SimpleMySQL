@@ -19,3 +19,6 @@ REVISION HISTORY:
           or 1 arg (hashref containing select, from, joins, wheres, order keys)
 	- Fixed bug in "build_select" that returned a blank WHERE statement when an empty arrayref was passed in
           causing a broken select statement to be created.
+
+0.5	
+	- Fixed stupid syntax error :)

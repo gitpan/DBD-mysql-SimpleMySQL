@@ -44,8 +44,8 @@ use vars qw/$VERSION $MOD_DATE $NAME $DEBUG $DEBUG_FILE  @ISA @EXPORT @EXPORT_OK
 );
 
 
-$VERSION = q|$Revision: 1.7 $|;
-$MOD_DATE = q|$Date: 2004/04/28 19:34:05 $|;
+$VERSION = q|$Revision: 1.8 $|;
+$MOD_DATE = q|$Date: 2004/04/28 20:07:27 $|;
 $NAME = "SimpleMySQL.pm";
 $DEBUG = 0;
 $DEBUG_FILE = 0;
@@ -305,6 +305,7 @@ sub build_select {
 	my $wheres;
 	my $order;
 	my $ref;
+	my $limit;
 	
 	if (scalar(@_) == 5) {
 		$select = shift;
@@ -320,7 +321,7 @@ sub build_select {
 		$joins = ${$ref}{joins};
 		$wheres = ${$ref}{wheres};
 		$order = ${$ref}{order};
-		$limit = ${$ref}{order};
+		$limit = ${$ref}{limit};
 	} else {
 		die "build_select must be passed 1 or 5 args";
 	}
